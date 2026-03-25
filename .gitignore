@@ -23,3 +23,6 @@ slam/range_libc/pywrapper/*.egg
 # Documentation (auto-generated)
 **/docs/html/
 **/docs/xml/
+
+# ML models (large binaries)
+perception/model/

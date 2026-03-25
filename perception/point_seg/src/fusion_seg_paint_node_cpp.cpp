@@ -46,7 +46,7 @@ public:
     declare_parameter("projected_image_topic", "/yolo_seg/projected_image");
     declare_parameter("camera_intrinsic_yaml", "");
     declare_parameter("camera_extrinsic_yaml", "");
-    declare_parameter("model_path", "/home/nuc14/work/model/yolo26n-seg_openvino_model");
+    declare_parameter("model_path", "/ws/src/creating_autonomous_car/perception/model/roboracer_v11n_seg_openvino_model");
     declare_parameter("device", "auto");
     declare_parameter("conf", 0.25);
     declare_parameter("iou", 0.45);
