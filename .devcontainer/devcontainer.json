@@ -37,7 +37,8 @@
         "source=${localWorkspaceFolder}/../cache/build,target=/ws/build,type=bind",
         "source=${localWorkspaceFolder}/../cache/install,target=/ws/install,type=bind",
         "source=${localWorkspaceFolder}/../cache/log,target=/ws/log,type=bind",
-        "source=${localEnv:HOME}/.ssh,target=/home/${localEnv:USER}/.ssh,type=bind,consistency=cached"
+        "source=${localEnv:HOME}/.ssh,target=/home/${localEnv:USER}/.ssh,type=bind,consistency=cached",
+        "source=/dev,target=/dev,type=bind"
     ],
     "postCreateCommand": "bash .devcontainer/post-create.sh",
     "postStartCommand": "sudo chmod 666 /dev/dri/card* /dev/dri/renderD* 2>/dev/null || true"
