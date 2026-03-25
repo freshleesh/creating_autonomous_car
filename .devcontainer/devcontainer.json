@@ -27,7 +27,8 @@
     "runArgs": [
         "--name", "creating_autonomous_car",
         "--net", "host",
-        "--privileged"
+        "--privileged",
+        "--device", "/dev/dri:/dev/dri"
     ],
     "mounts": [
         "source=${localEnv:XAUTHORITY},target=/tmp/.Xauthority,type=bind,consistency=cached",
@@ -37,5 +38,6 @@
         "source=${localWorkspaceFolder}/../cache/install,target=/ws/install,type=bind",
         "source=${localWorkspaceFolder}/../cache/log,target=/ws/log,type=bind"
     ],
-    "postCreateCommand": "mkdir -p /ws/build /ws/install /ws/log && sudo chmod 666 /dev/input/event* /dev/input/js* 2>/dev/null || true && cd /ws/src/creating_autonomous_car && bash build_packages_on_local_pc.sh"
+    "postCreateCommand": "bash .devcontainer/post-create.sh",
+    "postStartCommand": "sudo chmod 666 /dev/dri/card* /dev/dri/renderD* 2>/dev/null || true"
 }

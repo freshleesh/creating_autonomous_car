@@ -52,3 +52,4 @@ RUN echo "source /opt/ros/jazzy/setup.bash" >> /home/$USERNAME/.bashrc \
     && echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> /home/$USERNAME/.bashrc
 
 CMD ["/bin/bash"]
+
