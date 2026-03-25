@@ -1,0 +1,9 @@
+extrinsic_calibration_by_hand:
+  ros__parameters:
+    x: 0.006253
+    y: 0.000000
+    z: -0.200000
+    roll: 122.400000
+    pitch: -90.000000
+    yaw: -32.400000
+    cy: 560.000000

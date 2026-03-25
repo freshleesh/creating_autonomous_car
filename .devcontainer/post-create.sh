@@ -10,6 +10,14 @@ echo "deb https://apt.repos.intel.com/openvino/2024 ubuntu24 main" | sudo tee /e
 sudo apt update
 sudo apt install -y openvino libze1 libze-intel-gpu1 intel-opencl-icd clinfo
 
+# ROS2 Jazzy dependencies for sensor drivers
+sudo apt install -y \
+  ros-jazzy-camera-info-manager \
+  ros-jazzy-image-transport \
+  ros-jazzy-cv-bridge \
+  ros-jazzy-image-geometry \
+  ros-jazzy-pcl-ros
+
 mkdir -p /ws/build /ws/install /ws/log
 sudo chmod 666 /dev/input/event* /dev/input/js* 2>/dev/null || true
 

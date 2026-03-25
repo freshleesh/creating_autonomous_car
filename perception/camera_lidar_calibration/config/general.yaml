@@ -1,0 +1,17 @@
+extrinsic_calibration_by_hand:
+  ros__parameters:
+    image_topic: /image_raw
+    lidar_topic: /livox/lidar
+    debug_topic: /extrinsic_debug_image
+    roi_x_min: -100.000000
+    roi_x_max: 100.000000
+    roi_y_min: -100.000000
+    roi_y_max: 100.000000
+    roi_z_min: -10.000000
+    roi_z_max: 50.000000
+    voxel_size: 0.120000
+    decay_time: 0.400000
+    post_merge_voxel_size: 0.100000
+    max_projected_points: 330435
+    draw_point_radius: 5
+    profile_timing: true

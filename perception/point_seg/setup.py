@@ -1,6 +1,7 @@
 from setuptools import find_packages, setup
+from glob import glob
 
-package_name = 'perception'
+package_name = 'point_seg'
 
 setup(
     name=package_name,
@@ -10,20 +11,23 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', glob('launch/*.py')),
+        ('share/' + package_name + '/config', glob('config/*.yaml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='nuc5',
+    maintainer='nuc14',
     maintainer_email='jeongsangryu@gmail.com',
-    description='LiDAR-based obstacle detection and tracking for F1TENTH autonomous racing',
-    license='MIT',
+    description='Integrated high-speed point painting fusion node (YOLO seg + LiDAR projection).',
+    license='Apache-2.0',
     extras_require={
-        'test': ['pytest'],
+        'test': [
+            'pytest',
+        ],
     },
     entry_points={
         'console_scripts': [
-            'detect_node   = perception.detect_ros:main',
-            'tracking_node = perception.tracking_ros:main',
+            'fusion_seg_paint_node = point_seg.fusion_seg_paint_node:main',
         ],
     },
 )
