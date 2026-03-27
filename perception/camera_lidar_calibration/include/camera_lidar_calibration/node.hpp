@@ -69,7 +69,7 @@ private:
 
   // ── Rendering ────────────────────────────────────────────────────────────
   void drawOverlay(
-    cv::Mat & img, int n_pts, double fps, double decay, double cy,
+    cv::Mat & img, int n_pts, double fps, double decay,
     double voxel_size, const RoiBounds & roi) const;
   bool saveCurrentParamsToYaml();
   void stdinSaveLoop();

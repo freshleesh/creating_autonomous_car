@@ -16,7 +16,9 @@ sudo apt install -y \
   ros-jazzy-image-transport \
   ros-jazzy-cv-bridge \
   ros-jazzy-image-geometry \
-  ros-jazzy-pcl-ros
+  ros-jazzy-pcl-ros \
+  ros-jazzy-sophus \
+  libgtsam-dev
 
 mkdir -p /ws/build /ws/install /ws/log
 sudo chmod 666 /dev/input/event* /dev/input/js* 2>/dev/null || true

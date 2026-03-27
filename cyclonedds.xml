@@ -6,9 +6,9 @@
                 <NetworkInterface name="wlp~~~" multicast="false"/> 
             </Interfaces> -->
             <!-- For container: use localhost only -->
-            <Interfaces>
-                <NetworkInterface address="127.0.0.1" multicast="false"/>
-            </Interfaces>
+            <!-- <Interfaces>
+                <NetworkInterface address="wlo1" multicast="false"/>
+            </Interfaces> -->
             <AllowMulticast>false</AllowMulticast>
         </General>
         <Discovery>
@@ -18,8 +18,8 @@
             </Peers>
         </Discovery>
         <Internal>
-            <SocketReceiveBufferSize min="10MB"/>
-            <SocketSendBufferSize min="10MB"/>
+            <!-- <SocketReceiveBufferSize min="10MB"/>
+            <SocketSendBufferSize min="10MB"/> -->
         </Internal>
     </Domain>
 </CycloneDDS>

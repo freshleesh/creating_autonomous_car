@@ -96,9 +96,8 @@ Current values are saved to:
 
 Extrinsic parameters (`config/camera_extrinsic_calibration.yaml`):
 
-- `x, y, z`: LiDAR-to-camera translation (meters)
-- `roll, pitch, yaw`: LiDAR-to-camera rotation (degrees)
-- `cy`: camera principal point y (pixel), useful for minor vertical alignment tuning
+- `extrinsic.translation.x`, `y`, `z`: LiDAR-to-camera translation (meters)
+- `extrinsic.rotation.roll`, `pitch`, `yaw`: LiDAR-to-camera rotation (degrees)
 
 General processing parameters (`config/general.yaml`):
 

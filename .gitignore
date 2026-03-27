@@ -14,6 +14,7 @@ dist/
 slam/range_libc/pywrapper/dist/
 slam/range_libc/pywrapper/*.egg-info/
 slam/range_libc/pywrapper/*.egg
+slam/lio_mapping_loc/Log
 
 # IDE
 .vscode/
@@ -26,3 +27,6 @@ slam/range_libc/pywrapper/*.egg
 
 # ML models (large binaries)
 perception/model/
+
+# Rosbag data
+bag/

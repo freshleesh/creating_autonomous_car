@@ -16,7 +16,10 @@ def generate_launch_description():
                 executable="fusion_seg_paint_node_cpp",
                 name="point_seg_node",
                 output="screen",
-                parameters=[config_file],
+                parameters=[
+                    config_file,
+                    {"device": "GPU"},
+                ],
             ),
         ]
     )
