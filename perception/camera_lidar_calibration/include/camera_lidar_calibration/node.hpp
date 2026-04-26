@@ -2,6 +2,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <rcl_interfaces/msg/set_parameters_result.hpp>
+#include <image_transport/image_transport.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <std_msgs/msg/header.hpp>
@@ -69,13 +70,13 @@ private:
 
   // ── Rendering ────────────────────────────────────────────────────────────
   void drawOverlay(
-    cv::Mat & img, int n_pts, double fps, double decay,
+    cv::Mat & img, int n_pts, double fps, double decay, double cy,
     double voxel_size, const RoiBounds & roi) const;
   bool saveCurrentParamsToYaml();
   void stdinSaveLoop();
 
   // ── Subscribers / publisher ──────────────────────────────────────────────
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
+  image_transport::Subscriber image_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;
 
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_image_;

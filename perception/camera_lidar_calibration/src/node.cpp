@@ -63,26 +63,26 @@ ExtrinsicCalibrationNode::ExtrinsicCalibrationNode(
 {
   // ── Static / infrastructure parameters ──────────────────────────────────
   declare_parameter("image_topic",           "/image_raw");
+  declare_parameter("image_transport",       "raw");
   declare_parameter("lidar_topic",           "/livox/lidar");
   declare_parameter("debug_topic",           "/extrinsic_debug_image");
   declare_parameter("camera_intrinsic_yaml", "");
   declare_parameter("save_on_enter", true);
   declare_parameter("save_general_yaml", "");
   declare_parameter("save_params_yaml", "");
-  declare_parameter("save_general_yaml_src", "");  // src 경로
-  declare_parameter("save_params_yaml_src", "");   // src 경로
 
   // ── Load camera intrinsics ───────────────────────────────────────────────
   const auto intrinsic_path = get_parameter("camera_intrinsic_yaml").as_string();
   loadCameraIntrinsics(intrinsic_path);
 
   // ── Core extrinsic parameters (overridden by YAML params file at launch) ──
-  declare_parameter("extrinsic.translation.x", 0.006253, fp_desc("Translation X (m)", -5.0, 5.0));
-  declare_parameter("extrinsic.translation.y", -0.018056, fp_desc("Translation Y (m)", -5.0, 5.0));
-  declare_parameter("extrinsic.translation.z", -0.114992, fp_desc("Translation Z (m)", -5.0, 5.0));
-  declare_parameter("extrinsic.rotation.roll", 126.295327, fp_desc("Rotation Roll  (deg)", -180.0, 180.0));
-  declare_parameter("extrinsic.rotation.pitch", -88.042738, fp_desc("Rotation Pitch (deg)", -180.0, 180.0));
-  declare_parameter("extrinsic.rotation.yaw", -33.329511, fp_desc("Rotation Yaw   (deg)", -180.0, 180.0));
+  declare_parameter("x", 0.006253, fp_desc("Translation X (m)", -5.0, 5.0));
+  declare_parameter("y", -0.018056, fp_desc("Translation Y (m)", -5.0, 5.0));
+  declare_parameter("z", -0.114992, fp_desc("Translation Z (m)", -5.0, 5.0));
+  declare_parameter("roll", 126.295327, fp_desc("Rotation Roll  (deg)", -180.0, 180.0));
+  declare_parameter("pitch", -88.042738, fp_desc("Rotation Pitch (deg)", -180.0, 180.0));
+  declare_parameter("yaw", -33.329511, fp_desc("Rotation Yaw   (deg)", -180.0, 180.0));
+  declare_parameter("cy", camera_matrix_.at<double>(1, 2), fp_desc("Principal point cy (px)", 0.0, 2000.0));
 
   // ── ROI parameters (LiDAR frame, metres) ─────────────────────────────────
   declare_parameter("roi_x_min", -20.0, fp_desc("ROI min X (m)", -100.0,   0.0));
@@ -117,18 +117,17 @@ ExtrinsicCalibrationNode::ExtrinsicCalibrationNode(
 
   // ── Subscriptions ─────────────────────────────────────────────────────────
   const auto image_topic = get_parameter("image_topic").as_string();
+  const auto image_transport_name = get_parameter("image_transport").as_string();
   const auto lidar_topic = get_parameter("lidar_topic").as_string();
   const auto debug_topic = get_parameter("debug_topic").as_string();
-  
-  // Use BestEffort QoS for maximum compatibility
-  auto qos = rclcpp::QoS(rclcpp::KeepLast(1));
-  qos.best_effort();
-  qos.durability_volatile();
+  const auto qos = rclcpp::SensorDataQoS();
 
-  RCLCPP_INFO(get_logger(), "Subscribing to image topic: %s with BestEffort QoS", image_topic.c_str());
-  image_sub_ = create_subscription<sensor_msgs::msg::Image>(
-    image_topic, qos,
-    std::bind(&ExtrinsicCalibrationNode::imageCallback, this, std::placeholders::_1));
+  image_sub_ = image_transport::create_subscription(
+    this,
+    image_topic,
+    std::bind(&ExtrinsicCalibrationNode::imageCallback, this, std::placeholders::_1),
+    image_transport_name,
+    qos.get_rmw_qos_profile());
   lidar_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
     lidar_topic, qos,
     std::bind(&ExtrinsicCalibrationNode::lidarCallback, this, std::placeholders::_1));
@@ -143,11 +142,12 @@ ExtrinsicCalibrationNode::ExtrinsicCalibrationNode(
   RCLCPP_INFO(get_logger(),
     "ExtrinsicCalibrationNode ready.\n"
     "  image  → %s\n"
+    "  transport → %s\n"
     "  lidar  → %s\n"
     "  output → %s\n"
     "Press ENTER in this terminal to save current params to YAML.\n"
     "Use rqt (Plugins > Configuration > Dynamic Reconfigure) to tune parameters.",
-    image_topic.c_str(), lidar_topic.c_str(), debug_topic.c_str());
+    image_topic.c_str(), image_transport_name.c_str(), lidar_topic.c_str(), debug_topic.c_str());
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -155,28 +155,22 @@ ExtrinsicCalibrationNode::ExtrinsicCalibrationNode(
 // ──────────────────────────────────────────────────────────────────────────────
 void ExtrinsicCalibrationNode::loadCameraIntrinsics(const std::string & yaml_path)
 {
-  try {
-    YAML::Node cfg = YAML::LoadFile(yaml_path);
+  YAML::Node cfg = YAML::LoadFile(yaml_path);
 
-    const auto cam_data  = cfg["camera_matrix"]["data"].as<std::vector<double>>();
-    const auto dist_data = cfg["distortion_coefficients"]["data"].as<std::vector<double>>();
+  const auto cam_data  = cfg["camera_matrix"]["data"].as<std::vector<double>>();
+  const auto dist_data = cfg["distortion_coefficients"]["data"].as<std::vector<double>>();
 
-    camera_matrix_ = cv::Mat(3, 3, CV_64F);
-    for (int i = 0; i < 9; ++i) {
-      camera_matrix_.at<double>(i / 3, i % 3) = cam_data[i];
-    }
-
-    dist_coeffs_ = cv::Mat(1, static_cast<int>(dist_data.size()), CV_64F);
-    for (int i = 0; i < static_cast<int>(dist_data.size()); ++i) {
-      dist_coeffs_.at<double>(0, i) = dist_data[i];
-    }
-
-    RCLCPP_INFO(get_logger(), "Camera matrix loaded from: %s", yaml_path.c_str());
-  } catch (const std::exception & e) {
-    RCLCPP_ERROR(get_logger(), "Failed to load camera intrinsics from '%s': %s", 
-                 yaml_path.c_str(), e.what());
-    throw;
+  camera_matrix_ = cv::Mat(3, 3, CV_64F);
+  for (int i = 0; i < 9; ++i) {
+    camera_matrix_.at<double>(i / 3, i % 3) = cam_data[i];
   }
+
+  dist_coeffs_ = cv::Mat(1, static_cast<int>(dist_data.size()), CV_64F);
+  for (int i = 0; i < static_cast<int>(dist_data.size()); ++i) {
+    dist_coeffs_.at<double>(0, i) = dist_data[i];
+  }
+
+  RCLCPP_INFO(get_logger(), "Camera matrix loaded from: %s", yaml_path.c_str());
 }
 
 Eigen::Matrix4d ExtrinsicCalibrationNode::buildExtrinsicMatrix(
@@ -211,12 +205,12 @@ Eigen::Matrix4d ExtrinsicCalibrationNode::buildExtrinsicMatrix(
 
 void ExtrinsicCalibrationNode::updateExtrinsic()
 {
-  const double x     = get_parameter("extrinsic.translation.x").as_double();
-  const double y     = get_parameter("extrinsic.translation.y").as_double();
-  const double z     = get_parameter("extrinsic.translation.z").as_double();
-  const double roll  = get_parameter("extrinsic.rotation.roll").as_double();
-  const double pitch = get_parameter("extrinsic.rotation.pitch").as_double();
-  const double yaw   = get_parameter("extrinsic.rotation.yaw").as_double();
+  const double x     = get_parameter("x").as_double();
+  const double y     = get_parameter("y").as_double();
+  const double z     = get_parameter("z").as_double();
+  const double roll  = get_parameter("roll").as_double();
+  const double pitch = get_parameter("pitch").as_double();
+  const double yaw   = get_parameter("yaw").as_double();
 
   std::lock_guard<std::mutex> lk(extrinsic_mutex_);
   T_lidar_to_cam_ = buildExtrinsicMatrix(x, y, z, roll, pitch, yaw);
@@ -233,13 +227,7 @@ ExtrinsicCalibrationNode::onParamsChanged(
   result.successful = true;
 
   static const std::set<std::string> kExtrinsicNames =
-    {
-      "extrinsic.translation.x",
-      "extrinsic.translation.y",
-      "extrinsic.translation.z",
-      "extrinsic.rotation.roll",
-      "extrinsic.rotation.pitch",
-      "extrinsic.rotation.yaw"};
+    {"x", "y", "z", "roll", "pitch", "yaw"};
 
   // Helper: use new value if present in the update, else current node value
   auto get_val = [&](const std::string & name) -> double {
@@ -256,24 +244,16 @@ ExtrinsicCalibrationNode::onParamsChanged(
 
   if (needs_rebuild) {
     const auto T = buildExtrinsicMatrix(
-      get_val("extrinsic.translation.x"),
-      get_val("extrinsic.translation.y"),
-      get_val("extrinsic.translation.z"),
-      get_val("extrinsic.rotation.roll"),
-      get_val("extrinsic.rotation.pitch"),
-      get_val("extrinsic.rotation.yaw"));
+      get_val("x"), get_val("y"), get_val("z"),
+      get_val("roll"), get_val("pitch"), get_val("yaw"));
     {
       std::lock_guard<std::mutex> lk(extrinsic_mutex_);
       T_lidar_to_cam_ = T;
     }
     RCLCPP_INFO(get_logger(),
       "[param update] x=%.4f y=%.4f z=%.4f roll=%.3f pitch=%.3f yaw=%.3f",
-      get_val("extrinsic.translation.x"),
-      get_val("extrinsic.translation.y"),
-      get_val("extrinsic.translation.z"),
-      get_val("extrinsic.rotation.roll"),
-      get_val("extrinsic.rotation.pitch"),
-      get_val("extrinsic.rotation.yaw"));
+      get_val("x"), get_val("y"), get_val("z"),
+      get_val("roll"), get_val("pitch"), get_val("yaw"));
   }
 
   return result;
@@ -361,8 +341,6 @@ void ExtrinsicCalibrationNode::lidarCallback(
 void ExtrinsicCalibrationNode::imageCallback(
   const sensor_msgs::msg::Image::ConstSharedPtr & image_msg)
 {
-  RCLCPP_INFO_ONCE(get_logger(), "imageCallback: First image received!");
-  
   using Clock = std::chrono::steady_clock;
   const auto t0 = Clock::now();
   auto ms_since = [](const Clock::time_point & from, const Clock::time_point & to) {
@@ -388,6 +366,7 @@ void ExtrinsicCalibrationNode::imageCallback(
   const double post_merge_voxel = get_parameter("post_merge_voxel_size").as_double();
   const int max_projected_points = get_parameter("max_projected_points").as_int();
   const int draw_point_radius = get_parameter("draw_point_radius").as_int();
+  const double cy = get_parameter("cy").as_double();
   const bool profile_timing = get_parameter("profile_timing").as_bool();
   const auto t_params = Clock::now();
 
@@ -395,7 +374,7 @@ void ExtrinsicCalibrationNode::imageCallback(
   try {
     cv_ptr = cv_bridge::toCvCopy(image_msg, "bgr8");
   } catch (const cv_bridge::Exception & e) {
-    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 1000, "cv_bridge exception: %s", e.what());
+    RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
     return;
   }
   cv::Mat & img = cv_ptr->image;
@@ -442,7 +421,7 @@ void ExtrinsicCalibrationNode::imageCallback(
   const auto t_post = Clock::now();
 
   if (merged->empty()) {
-    drawOverlay(img, 0, fps, decay, voxel_size, roi);
+    drawOverlay(img, 0, fps, decay, cy, voxel_size, roi);
     auto out = cv_ptr->toImageMsg();
     out->header = image_msg->header;
     pub_image_->publish(*out);
@@ -455,6 +434,7 @@ void ExtrinsicCalibrationNode::imageCallback(
     T = T_lidar_to_cam_;
   }
   cv::Mat cam_mat = camera_matrix_.clone();
+  cam_mat.at<double>(1, 2) = cy;
 
   std::size_t sample_step = 1;
   if (max_projected_points > 0 &&
@@ -492,7 +472,7 @@ void ExtrinsicCalibrationNode::imageCallback(
   const auto t_transform = Clock::now();
 
   if (pts_cam.empty()) {
-    drawOverlay(img, 0, fps, decay, voxel_size, roi);
+    drawOverlay(img, 0, fps, decay, cy, voxel_size, roi);
     auto out = cv_ptr->toImageMsg();
     out->header = image_msg->header;
     pub_image_->publish(*out);
@@ -542,7 +522,7 @@ void ExtrinsicCalibrationNode::imageCallback(
   }
   const auto t_draw = Clock::now();
 
-  drawOverlay(img, n_drawn, fps, decay, voxel_size, roi);
+  drawOverlay(img, n_drawn, fps, decay, cy, voxel_size, roi);
   const auto t_overlay = Clock::now();
 
   auto out_msg = cv_ptr->toImageMsg();
@@ -575,9 +555,6 @@ bool ExtrinsicCalibrationNode::saveCurrentParamsToYaml()
 {
   const auto general_yaml = get_parameter("save_general_yaml").as_string();
   const auto params_yaml = get_parameter("save_params_yaml").as_string();
-  const auto general_yaml_src = get_parameter("save_general_yaml_src").as_string();
-  const auto params_yaml_src = get_parameter("save_params_yaml_src").as_string();
-  
   if (general_yaml.empty() || params_yaml.empty()) {
     RCLCPP_ERROR(
       get_logger(),
@@ -615,14 +592,14 @@ bool ExtrinsicCalibrationNode::saveCurrentParamsToYaml()
   params_out
     << "extrinsic_calibration_by_hand:\n"
     << "  ros__parameters:\n"
-    << "    extrinsic.translation.x: " << fmt_double(get_parameter("extrinsic.translation.x").as_double()) << "\n"
-    << "    extrinsic.translation.y: " << fmt_double(get_parameter("extrinsic.translation.y").as_double()) << "\n"
-    << "    extrinsic.translation.z: " << fmt_double(get_parameter("extrinsic.translation.z").as_double()) << "\n"
-    << "    extrinsic.rotation.roll: " << fmt_double(get_parameter("extrinsic.rotation.roll").as_double()) << "\n"
-    << "    extrinsic.rotation.pitch: " << fmt_double(get_parameter("extrinsic.rotation.pitch").as_double()) << "\n"
-    << "    extrinsic.rotation.yaw: " << fmt_double(get_parameter("extrinsic.rotation.yaw").as_double()) << "\n";
+    << "    x: " << fmt_double(get_parameter("x").as_double()) << "\n"
+    << "    y: " << fmt_double(get_parameter("y").as_double()) << "\n"
+    << "    z: " << fmt_double(get_parameter("z").as_double()) << "\n"
+    << "    roll: " << fmt_double(get_parameter("roll").as_double()) << "\n"
+    << "    pitch: " << fmt_double(get_parameter("pitch").as_double()) << "\n"
+    << "    yaw: " << fmt_double(get_parameter("yaw").as_double()) << "\n"
+    << "    cy: " << fmt_double(get_parameter("cy").as_double()) << "\n";
 
-  // Save to install directory
   std::ofstream gfs(general_yaml, std::ios::out | std::ios::trunc);
   if (!gfs) {
     RCLCPP_ERROR(get_logger(), "Failed opening general yaml for write: %s", general_yaml.c_str());
@@ -639,31 +616,10 @@ bool ExtrinsicCalibrationNode::saveCurrentParamsToYaml()
   pfs << params_out.str();
   pfs.close();
 
-  // Save to src directory as well
-  if (!general_yaml_src.empty()) {
-    std::ofstream gfs_src(general_yaml_src, std::ios::out | std::ios::trunc);
-    if (gfs_src) {
-      gfs_src << general_out.str();
-      gfs_src.close();
-    } else {
-      RCLCPP_WARN(get_logger(), "Failed opening src general yaml for write: %s", general_yaml_src.c_str());
-    }
-  }
-
-  if (!params_yaml_src.empty()) {
-    std::ofstream pfs_src(params_yaml_src, std::ios::out | std::ios::trunc);
-    if (pfs_src) {
-      pfs_src << params_out.str();
-      pfs_src.close();
-    } else {
-      RCLCPP_WARN(get_logger(), "Failed opening src params yaml for write: %s", params_yaml_src.c_str());
-    }
-  }
-
   RCLCPP_INFO(
     get_logger(),
-    "Saved current parameters to:\n  install: %s\n  install: %s\n  src: %s\n  src: %s",
-    general_yaml.c_str(), params_yaml.c_str(), general_yaml_src.c_str(), params_yaml_src.c_str());
+    "Saved current parameters to:\n  general: %s\n  params : %s",
+    general_yaml.c_str(), params_yaml.c_str());
   return true;
 }
 
@@ -689,7 +645,7 @@ void ExtrinsicCalibrationNode::stdinSaveLoop()
 // HUD overlay
 // ──────────────────────────────────────────────────────────────────────────────
 void ExtrinsicCalibrationNode::drawOverlay(
-  cv::Mat & img, int n_pts, double fps, double decay,
+  cv::Mat & img, int n_pts, double fps, double decay, double cy,
   double voxel_size, const RoiBounds & roi) const
 {
   auto g = [&](const std::string & name) {
@@ -709,17 +665,19 @@ void ExtrinsicCalibrationNode::drawOverlay(
     [&]() {
       std::ostringstream s;
       s << std::fixed << std::setprecision(4)
-        << "x=" << g("extrinsic.translation.x")
-        << " m   y=" << g("extrinsic.translation.y")
-        << " m   z=" << g("extrinsic.translation.z") << " m";
+        << "x=" << g("x") << " m   y=" << g("y") << " m   z=" << g("z") << " m";
       return s.str();
     }(),
     [&]() {
       std::ostringstream s;
       s << std::fixed << std::setprecision(3)
-        << "roll=" << g("extrinsic.rotation.roll")
-        << " deg   pitch=" << g("extrinsic.rotation.pitch")
-        << " deg   yaw=" << g("extrinsic.rotation.yaw") << " deg";
+        << "roll=" << g("roll") << " deg   pitch=" << g("pitch")
+        << " deg   yaw=" << g("yaw") << " deg";
+      return s.str();
+    }(),
+    [&]() {
+      std::ostringstream s;
+      s << std::fixed << std::setprecision(2) << "cy=" << cy << " px";
       return s.str();
     }(),
     [&]() {
